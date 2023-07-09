@@ -9,7 +9,7 @@ from dataclasses import dataclass
 class TimeSeriesDataGenerator:
     STATES = ['ACTIVE', 'IDLE', 'OFF']
     RMS_RANGES = {'OFF': (0, 1), 'IDLE': (2, 300), 'ACTIVE': (301, 600)}
-    MIN_DURATION = 2
+    MIN_DURATION = 10
 
     def verify_inputs(
         self,
@@ -57,18 +57,38 @@ class TimeSeriesDataGenerator:
             rms_values.append(current_rms)
             states.append(current_state)
 
-    def kalman_filter(self, rms_values: list) -> list:
+    def kalman_filter(self, df: pd.DataFrame) -> list:
+        # Compare the current state to the previous state
+        df['state_change'] = df['state'] != df['state'].shift()
+        # Get the indices where state has changed
+        change_indices = df[df['state_change']].index.tolist()
+        # Add the starting and ending index to change_indices
+        change_indices = change_indices + [len(df)]
+
+        pairs = [[change_indices[i], change_indices[i+1]] for i in range(len(change_indices)-1)]
+
         # Create a Kalman Filter
         kf = KalmanFilter(transition_matrices=[1],
                         observation_matrices=[1],
                         initial_state_mean=0,
                         initial_state_covariance=1,
-                        observation_covariance=1,
-                        transition_covariance=.01)
-
-        # Use the observations y to get a rolling mean and variance
-        rms_means, rms_covariances = kf.em(rms_values).smooth(rms_values)
-        return rms_means
+                        observation_covariance=0.7,
+                        transition_covariance=1)
+        rms_smoothed = []
+        # Loop over pairs of indices in change_indices
+        for pair in pairs:
+            # Select the data in the current interval
+            interval_data = df['rms'][pair[0]:pair[1]]    
+            # Ensure there is more than one data point in the interval
+            if len(interval_data) > 1:
+                # Apply the Kalman filter to the data in the current interval
+                state_means, state_covariances = kf.em(interval_data).smooth(interval_data)
+                # Replace the 'rms' values in the DataFrame with the filtered values
+                rms_smoothed.append(state_means.flatten())
+            else:
+                rms_smoothed.append(interval_data)
+        
+        return [item for sublist in rms_smoothed for item in sublist]
         
     def generate_time_series_data(
     self,
@@ -108,4 +128,20 @@ class TimeSeriesDataGenerator:
         df['state'] = states
         df['rms'] = rms_values
 
+        df['rms_smoothed'] = self.kalman_filter(df)
+
         return df
+
+def generate_rms_ranges(
+    min_value_1: int = 2,
+    max_value_1: int = 300,
+    max_value_2: int = 600
+):
+    value_1 = random.uniform(min_value_1, max_value_1)
+    value_2 = random.uniform(value_1+1, max_value_2)
+    rms_ranges = {
+        'OFF': (0, 1),
+        'IDLE': (2, value_1),
+        'ACTIVE': (value_1 + 1, value_2)
+    }
+    return rms_ranges
