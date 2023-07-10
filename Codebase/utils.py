@@ -3,10 +3,8 @@ import pandas as pd
 import random
 from tqdm import tqdm
 from pykalman import KalmanFilter
-from dataclasses import dataclass
 from typing import List, Tuple
 
-@dataclass
 class TimeSeriesDataGenerator:
     '''
     This class generates time series data for a given set of states and rms ranges.

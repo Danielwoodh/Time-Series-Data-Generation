@@ -33,42 +33,55 @@ class StateGenerator:
     '''
     This class generates random states for the time series dataset.
     '''
-    def __init__(self, states: List[States]):
+    def __init__(self, states: List[States], transition_probabilities: Dict[States, Dict[States, float]]):
         if not states:
             raise ValueError("States list cannot be empty.")
         self.states = states
+        self.transition_probabilities = transition_probabilities
 
-    def generate_state(self) -> States:
+    def generate_state(self, current_state: States) -> States:
         '''
-        This function generates a random state.
+        This function generates the next state based on the current state and transition probabilities.
+
+        Args:
+            current_state (States): The current state.
 
         Outputs:
-            current_state (States): The current state.
+            next_state (States): The next state.
         '''
-        return random.choice(self.states)
+        transition_probs = self.transition_probabilities.get(current_state)
+        if transition_probs is None:
+            raise ValueError(f"No transition probabilities defined for state {current_state}.")
+
+        next_state = random.choices(
+            population=list(transition_probs.keys()),
+            weights=list(transition_probs.values())
+        )[0]
+
+        return next_state
 
 
 class IntervalGenerator:
     '''
     This class generates the intervals for the time series data.
     '''
-    def __init__(self, min_duration: int, max_duration: int):
-        self.min_duration = min_duration
-        self.max_duration = max_duration
+    def __init__(self, state_duration_map: Dict[States, Tuple[int, int]]):
+        self.state_duration_map = state_duration_map
 
-    def generate_interval(self, current_state: States) -> int:
+    def get_duration_for_state(self, state: States) -> int:
         '''
-        This function generates a random interval for the current state.
+        This function returns a duration for the given state based on the state duration map.
 
         Args:
-            current_state (States): The current state.
-            default_interval_ranges (Dict[States, Tuple[int, int]]): The default interval ranges for each state.
+            state (States): The current state.
 
         Outputs:
-            interval (int): The interval in seconds.
+            duration (int): The duration for the state.
         '''
-        interval = random.randint(self.min_duration, self.max_duration)
-        return interval
+        duration_range = self.state_duration_map.get(state)
+        if duration_range is None:
+            raise ValueError(f"No duration range defined for state {state}.")
+        return int(np.random.uniform(duration_range[0], duration_range[1]))
 
     def calculate_steps(self, interval: int, freq: str) -> int:
         '''
@@ -88,7 +101,7 @@ class RMSGenerator:
     '''
     This class generates random RMS values for the time series dataset.
     '''
-    def __init__(self, rms_ranges: Dict[States, Tuple[float, float]]):
+    def __init__(self, rms_ranges: Dict[States, Tuple[str, float, float]]):
         self.rms_ranges = rms_ranges
 
     def calculate_rms(self, current_state: States) -> float:
@@ -104,7 +117,15 @@ class RMSGenerator:
         rms_range = self.rms_ranges.get(current_state)
         if rms_range is None:
             raise ValueError(f"No range defined for state {current_state}.")
-        return np.random.uniform(rms_range[0], rms_range[1])
+        match rms_range[0]:
+            case 'normal':
+                return np.random.normal(rms_range[1], rms_range[2])
+            case 'uniform':
+                return np.random.uniform(rms_range[1], rms_range[2])
+            case 'lognormal':
+                return np.random.lognormal(rms_range[1], rms_range[2])
+            case _:
+                raise ValueError(f'RMS Generator failed for state {current_state}.')
 
 
 class DataGenerator:
@@ -116,14 +137,61 @@ class DataGenerator:
         state_generator: StateGenerator,
         rms_generator: RMSGenerator,
         interval_generator: IntervalGenerator,
-        kalman_filter: KalmanFilter
+        kalman_filter: KalmanFilter = None
     ):
         self.state_generator = state_generator
         self.rms_generator = rms_generator
         self.interval_generator = interval_generator
         self.kalman_filter = kalman_filter
 
-    def _generate_data_for_interval(self, current_state: States, current_timestamp: datetime, freq: str, interval: int) -> List[Tuple[float, States, datetime]]:
+    def _verify_inputs(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        interval_ranges: Dict[States, Tuple[float, float]],
+        freq: str
+    ) -> None:
+        '''
+        This function verifies the inputs to the generate_time_series_data function.
+
+        Args:
+            start_date (datetime): The start date of the dataset.
+            end_date (datetime): The end date of the dataset.
+            max_duration (int): The maximum duration of a state in seconds.
+            freq (str): The frequency of the dataset.
+
+        Raises:
+            ValueError: If start_date >= end_date.
+            ValueError: If max_duration < self.min_duration.
+            ValueError: If max_duration < pd.Timedelta(freq).total_seconds().
+            ValueError: If self.rms_ranges['OFF'][0] != 0 or self.rms_ranges['OFF'][1] != 1.
+            ValueError: If self.rms_ranges['IDLE'][0] <= 1.
+            ValueError: If self.rms_ranges['ACTIVE'][0] <= self.rms_ranges['IDLE'][1].
+        '''
+        if start_date >= end_date:
+            raise ValueError("Start date must be before end date.")
+
+        if max_duration < self.min_duration:
+            raise ValueError("Maximum duration must be greater than minimum duration.")
+
+        if max_duration < pd.Timedelta(freq).total_seconds():
+            raise ValueError("Frequency must be less than the maximum duration.")
+
+        if self.rms_ranges['OFF'][0] != 0 or self.rms_ranges['OFF'][1] != 5:
+            raise ValueError("'OFF' state range must be strictly between 0 and 5.")
+
+        if self.rms_ranges['IDLE'][0] <= 1:
+            raise ValueError("'IDLE' state range must start from a value greater than 1.")
+
+        if self.rms_ranges['ACTIVE'][0] <= self.rms_ranges['IDLE'][1]:
+            raise ValueError("'ACTIVE' state range must start from a value greater than the end of 'IDLE' range.")
+
+    def _generate_data_for_interval(
+        self,
+        current_state: States,
+        current_timestamp: datetime,
+        freq: str, interval: int
+    ) -> List[Tuple[float, States, datetime]]:
         '''
         Generate data for a single interval.
 
@@ -149,7 +217,7 @@ class DataGenerator:
         self,
         start_date: datetime,
         end_date: datetime,
-        freq: str = '1S',
+        freq: str = '10S',
     ) -> pd.DataFrame:
         '''
         This function generates a time series dataset with the following columns:
@@ -167,16 +235,16 @@ class DataGenerator:
             time_series_df (pd.DataFrame): The generated dataset.
         '''
         time_series_data = []
-
-        current_state = self.state_generator.generate_state()
+        current_state = States.OFF
+        current_state = self.state_generator.generate_state(current_state)
         current_timestamp = start_date
 
         while current_timestamp < end_date:
-            interval = random.randint(self.interval_generator.min_duration, self.interval_generator.max_duration)
+            interval = self.interval_generator.get_duration_for_state(current_state)
             interval_data = self._generate_data_for_interval(current_state, current_timestamp, freq, interval)
             time_series_data.extend(interval_data)
             current_timestamp = interval_data[-1][-1]
-            current_state = self.state_generator.generate_state()
+            current_state = self.state_generator.generate_state(current_state)
 
         time_series_df = self._create_dataframe(time_series_data)
         return time_series_df
@@ -193,7 +261,8 @@ class DataGenerator:
         '''
         time_series_df = pd.DataFrame(time_series_data, columns=[RMS, STATE, TIMESTAMP])
         time_series_df[STATE_CHANGE] = time_series_df[STATE] != time_series_df[STATE].shift()
-        time_series_df[RMS_SMOOTHED] = self._apply_kalman_filter(time_series_df)
+        if self.kalman_filter:
+            time_series_df[RMS_SMOOTHED] = self._apply_kalman_filter(time_series_df)
         return time_series_df
 
     def _apply_kalman_filter(self, time_series_df: pd.DataFrame) -> pd.Series:
@@ -210,30 +279,24 @@ class DataGenerator:
         time_series_df['group'] = (time_series_df[STATE_CHANGE]).cumsum()
 
         # Pad each group with a small buffer of data from the neighboring group
-        buffer_size = 2  # The size of the buffer, adjust as needed
+        buffer_size = 5  # The size of the buffer, adjust as needed
         time_series_df[RMS] = time_series_df.groupby('group')[RMS].transform(lambda x: x.rolling(buffer_size, min_periods=1).mean())
 
         # Apply the Kalman filter to each group separately
         rms_smoothed = time_series_df.groupby('group').apply(lambda group: self._apply_kalman_filter_to_group(group[RMS]))
+        print(f'rms_smoothed_initial: {rms_smoothed.head()}')
+        print(type(rms_smoothed))
 
-        # Flatten the MultiIndex
         rms_smoothed = rms_smoothed.reset_index(level=0, drop=True)
+        print(f'rms_smoothed_reset: {rms_smoothed.head()}')
+        if isinstance(rms_smoothed, pd.Series):
+            return rms_smoothed
+        elif len(rms_smoothed.columns) > 1:
+            # If the Series has a MultiIndex, drop the first level
+            rms_smoothed = rms_smoothed.droplevel(0)
+            print(f'rms_smoothed: {rms_smoothed}')
 
         return rms_smoothed
-
-    # def _apply_kalman_filter(self, time_series_df: pd.DataFrame) -> List[float]:
-    #     '''
-    #     This function applies a Kalman filter to the 'rms' column of the DataFrame to smooth the data.
-
-    #     Args:
-    #         time_series_df (pd.DataFrame): The DataFrame containing the 'rms' column.
-
-    #     Outputs:
-    #         rms_smoothed (List[float]): The smoothed 'rms' values.
-    #     '''
-    #     time_series_df[STATE_CHANGE] = time_series_df[STATE] != time_series_df[STATE].shift()
-    #     state_means, _ = self.kalman_filter.em(time_series_df[RMS].values).smooth(time_series_df[RMS].values)
-    #     return [item for sublist in state_means for item in sublist]
 
     def _apply_kalman_filter_to_group(self, group_rms: pd.Series) -> pd.Series:
         '''

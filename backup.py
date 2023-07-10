@@ -20,7 +20,7 @@ DEFAULT_RMS_RANGES = {
 }
 
 DEFAULT_MIN_DURATION = 1
-DEFAULT_MAX_DURATION = 60
+DEFAULT_MAX_DURATION = 200
 
 # Column names
 TIMESTAMP = 'timestamp'
@@ -198,3 +198,134 @@ class DataGenerator:
 
         time_series_df = self._create_dataframe(time_series_data)
         return time_series_df
+
+
+
+
+
+
+
+
+# class StateGenerator:
+#     '''
+#     This class generates random states for the time series dataset.
+#     '''
+#     def __init__(self, states: List[States], transition_probabilities: Dict[States, Dict[States, float]]):
+#         if not states:
+#             raise ValueError("States list cannot be empty.")
+#         self.states = states
+#         self.transition_probabilities = transition_probabilities
+
+#     def generate_state(self, current_state: States) -> States:
+#         '''
+#         This function generates the next state based on the current state and transition probabilities.
+
+#         Args:
+#             current_state (States): The current state.
+
+#         Outputs:
+#             next_state (States): The next state.
+#         '''
+#         transition_probs = self.transition_probabilities.get(current_state)
+#         if transition_probs is None:
+#             raise ValueError(f"No transition probabilities defined for state {current_state}.")
+
+#         next_state = random.choices(
+#             population=list(transition_probs.keys()),
+#             weights=list(transition_probs.values())
+#         )[0]
+
+#         return next_state
+
+
+# class IntervalGenerator:
+#     '''
+#     This class generates the intervals for the time series data.
+#     '''
+#     def __init__(self, state_duration_map: Dict[States, Tuple[int, int]]):
+#         self.state_duration_map = state_duration_map
+
+#     def get_duration_for_state(self, state: States) -> int:
+#         '''
+#         This function returns a duration for the given state based on the state duration map.
+
+#         Args:
+#             state (States): The current state.
+
+#         Outputs:
+#             duration (int): The duration for the state.
+#         '''
+#         duration_range = self.state_duration_map.get(state)
+#         if duration_range is None:
+#             raise ValueError(f"No duration range defined for state {state}.")
+#         return int(np.random.uniform(duration_range[0], duration_range[1]))
+
+#     def calculate_steps(self, interval: int, freq: str) -> int:
+#         '''
+#         This function calculates the number of steps for a given interval and frequency.
+
+#         Args:
+#             interval (int): The interval in seconds.
+#             freq (str): The frequency of the dataset.
+
+#         Outputs:
+#             steps (int): The number of steps for the given interval.
+#         '''
+#         return int(interval / pd.Timedelta(freq).total_seconds())
+
+
+
+
+# class StateGenerator:
+#     '''
+#     This class generates random states for the time series dataset.
+#     '''
+#     def __init__(self, states: List[States]):
+#         if not states:
+#             raise ValueError("States list cannot be empty.")
+#         self.states = states
+
+#     def generate_state(self) -> States:
+#         '''
+#         This function generates a random state.
+
+#         Outputs:
+#             current_state (States): The current state.
+#         '''
+#         return random.choice(self.states)
+
+
+# class IntervalGenerator:
+#     '''
+#     This class generates the intervals for the time series data.
+#     '''
+#     def __init__(self, min_duration: int, max_duration: int):
+#         self.min_duration = min_duration
+#         self.max_duration = max_duration
+
+#     def generate_interval(self, current_state: States) -> int:
+#         '''
+#         This function generates a random interval for the current state.
+
+#         Args:
+#             current_state (States): The current state.
+#             default_interval_ranges (Dict[States, Tuple[int, int]]): The default interval ranges for each state.
+
+#         Outputs:
+#             interval (int): The interval in seconds.
+#         '''
+#         interval = random.randint(self.min_duration, self.max_duration)
+#         return interval
+
+#     def calculate_steps(self, interval: int, freq: str) -> int:
+#         '''
+#         This function calculates the number of steps for a given interval and frequency.
+
+#         Args:
+#             interval (int): The interval in seconds.
+#             freq (str): The frequency of the dataset.
+
+#         Outputs:
+#             steps (int): The number of steps for the given interval.
+#         '''
+#         return int(interval / pd.Timedelta(freq).total_seconds())
