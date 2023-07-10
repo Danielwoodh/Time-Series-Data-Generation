@@ -34,10 +34,28 @@ class StateGenerator:
     This class generates random states for the time series dataset.
     '''
     def __init__(self, states: List[States], transition_probabilities: Dict[States, Dict[States, float]]):
-        if not states:
-            raise ValueError("States list cannot be empty.")
+        self.validate_inputs(states, transition_probabilities)
         self.states = states
         self.transition_probabilities = transition_probabilities
+
+    @staticmethod
+    def validate_inputs(
+        states: List[States],
+        transition_probabilities: Dict[States, Dict[States, float]]
+    ) -> None:
+        '''
+        This function validates the inputs to the StateGenerator class.
+
+        Args:
+            states (List[States]): The list of states.
+            transition_probabilities (Dict[States, Dict[States, float]]): The transition probabilities.
+        '''
+        if not all(isinstance(state, States) for state in States):
+            raise ValueError('All states must be instances of the States Enum.')
+        if not all(isinstance(state, States) and isinstance(prob_dict, dict) 
+                    and all(isinstance(s, States) and isinstance(p, float) for s, p in prob_dict.items()) 
+                    for state, prob_dict in transition_probabilities.items()):
+            raise ValueError("Transition probabilities must be a dictionary of States mapped to dictionary of states and probabilities.")
 
     def generate_state(self, current_state: States) -> States:
         '''
@@ -66,7 +84,21 @@ class IntervalGenerator:
     This class generates the intervals for the time series data.
     '''
     def __init__(self, state_duration_map: Dict[States, Tuple[int, int]]):
+        self.validate_inputs(state_duration_map)
         self.state_duration_map = state_duration_map
+
+    @staticmethod
+    def validate_inputs(state_duration_map: Dict[States, Tuple[int, int]]) -> None:
+        '''
+        This function validates the inputs to the IntervalGenerator class.
+
+        Args:
+            state_duration_map (Dict[States, Tuple[int, int]]): The state duration map.
+        '''
+        if not all(isinstance(state, States) and isinstance(duration, tuple) 
+                    and len(duration) == 2 and all(isinstance(d, int) for d in duration) 
+                    for state, duration in state_duration_map.items()):
+            raise ValueError("State duration map must be a dictionary of States mapped to tuples of two integers.")
 
     def get_duration_for_state(self, state: States) -> int:
         '''
@@ -100,9 +132,30 @@ class IntervalGenerator:
 class RMSGenerator:
     '''
     This class generates random RMS values for the time series dataset.
+
+    Args:
+        rms_ranges (Dict[States, Tuple[str, float, float]]): The RMS ranges and distribution type for each state,
+        note that if uniform or lognormal distributions are chosen, the (min, max) values become (mu, sigma).
     '''
     def __init__(self, rms_ranges: Dict[States, Tuple[str, float, float]]):
+        self.validate_inputs(rms_ranges)
         self.rms_ranges = rms_ranges
+
+    @staticmethod
+    def _validate_inputs(rms_ranges: Dict[States, Tuple[str, float, float]]) -> None:
+        '''
+        This function validates the inputs to the RMSGenerator class.
+
+        Args:
+            rms_ranges (Dict[States, Tuple[str, float, float]]): The RMS ranges and distribution type for each state.
+        '''
+        if not all(isinstance(state, States) and isinstance(rms_info, tuple) 
+                    and len(rms_info) == 3 and isinstance(rms_info[0], str) 
+                    and all(isinstance(num, (int, float)) for num in rms_info[1:]) 
+                    for state, rms_info in rms_ranges.items()):
+            raise ValueError("""RMS ranges must be a dictionary of States mapped to tuples containing a string (distribution-type)
+                and two numbers (either (min, max) or (mu, sigma) depending on distribution type)."""
+            )
 
     def calculate_rms(self, current_state: States) -> float:
         '''
@@ -131,6 +184,12 @@ class RMSGenerator:
 class DataGenerator:
     '''
     This class generates time series data for a given set of states and rms ranges.
+
+    Args:
+        state_generator (StateGenerator): The state generator.
+        rms_generator (RMSGenerator): The RMS generator.
+        interval_generator (IntervalGenerator): The interval generator.
+        kalman_filter (KalmanFilter): The Kalman filter to smooth the RMS values.
     '''
     def __init__(
         self,
@@ -144,11 +203,11 @@ class DataGenerator:
         self.interval_generator = interval_generator
         self.kalman_filter = kalman_filter
 
-    def _verify_inputs(
+    @staticmethod
+    def _validate_inputs(
         self,
         start_date: datetime,
         end_date: datetime,
-        interval_ranges: Dict[States, Tuple[float, float]],
         freq: str
     ) -> None:
         '''
@@ -157,34 +216,29 @@ class DataGenerator:
         Args:
             start_date (datetime): The start date of the dataset.
             end_date (datetime): The end date of the dataset.
-            max_duration (int): The maximum duration of a state in seconds.
             freq (str): The frequency of the dataset.
 
         Raises:
             ValueError: If start_date >= end_date.
-            ValueError: If max_duration < self.min_duration.
-            ValueError: If max_duration < pd.Timedelta(freq).total_seconds().
-            ValueError: If self.rms_ranges['OFF'][0] != 0 or self.rms_ranges['OFF'][1] != 1.
-            ValueError: If self.rms_ranges['IDLE'][0] <= 1.
-            ValueError: If self.rms_ranges['ACTIVE'][0] <= self.rms_ranges['IDLE'][1].
+            ValueError: If start_date or end_date is not a datetime object.
+            ValueError: If freq is not a valid pandas date frequency.
         '''
+        if not isinstance(start_date, datetime) or not isinstance(end_date, datetime):
+            raise ValueError("Start date and end date must be datetime objects.")
+
         if start_date >= end_date:
             raise ValueError("Start date must be before end date.")
+        
+        try:
+            pd.Timedelta(freq)
+        except ValueError:
+            raise ValueError("Frequency must be a valid pandas date frequency string.")
 
-        if max_duration < self.min_duration:
-            raise ValueError("Maximum duration must be greater than minimum duration.")
-
-        if max_duration < pd.Timedelta(freq).total_seconds():
-            raise ValueError("Frequency must be less than the maximum duration.")
-
-        if self.rms_ranges['OFF'][0] != 0 or self.rms_ranges['OFF'][1] != 5:
-            raise ValueError("'OFF' state range must be strictly between 0 and 5.")
-
-        if self.rms_ranges['IDLE'][0] <= 1:
-            raise ValueError("'IDLE' state range must start from a value greater than 1.")
-
-        if self.rms_ranges['ACTIVE'][0] <= self.rms_ranges['IDLE'][1]:
-            raise ValueError("'ACTIVE' state range must start from a value greater than the end of 'IDLE' range.")
+        if pd.Timedelta(freq).total_seconds() < 1:
+            raise ValueError("Frequency must be at least 1 second.")
+        
+        if pd.Timedelta(freq).total_seconds() > end_date - start_date:
+            raise ValueError("Frequency must be less than the time between start date and end date.")
 
     def _generate_data_for_interval(
         self,
@@ -234,16 +288,24 @@ class DataGenerator:
         Outputs:
             time_series_df (pd.DataFrame): The generated dataset.
         '''
+        self._verify_inputs(start_date, end_date, freq)
+        
         time_series_data = []
         current_state = States.OFF
         current_state = self.state_generator.generate_state(current_state)
         current_timestamp = start_date
 
+        # Generate data for each interval
         while current_timestamp < end_date:
+            # Generate the current interval for the state
             interval = self.interval_generator.get_duration_for_state(current_state)
+            # Generate the data for the interval
             interval_data = self._generate_data_for_interval(current_state, current_timestamp, freq, interval)
+            # Extend the time series data with the interval data
             time_series_data.extend(interval_data)
+            # Update the current timestamp and state
             current_timestamp = interval_data[-1][-1]
+            # Generate a new state
             current_state = self.state_generator.generate_state(current_state)
 
         time_series_df = self._create_dataframe(time_series_data)
