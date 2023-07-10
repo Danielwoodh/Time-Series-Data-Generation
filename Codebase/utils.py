@@ -231,10 +231,10 @@ def generate_rms_ranges(
         rms_ranges (dict): A dictionary of rms ranges for the 'OFF', 'IDLE', and 'ACTIVE' states.
     '''
     value_1 = random.uniform(min_value_1, max_value_1)
-    value_2 = random.uniform(value_1+1, max_value_2)
+    value_2 = random.uniform(value_1 - 50, max_value_2)
     rms_ranges = {
         'OFF': (0, 1),
         'IDLE': (2, value_1),
-        'ACTIVE': (value_1 + 1, value_2)
+        'ACTIVE': (value_1 - 50, value_2)
     }
     return rms_ranges

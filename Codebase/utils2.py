@@ -13,13 +13,13 @@ class States(Enum):
     OFF = 'OFF'
 
 DEFAULT_RMS_RANGES = {
-    States.OFF: (0, 1), 
-    States.IDLE: (2, 300), 
-    States.ACTIVE: (301, 600)
+    States.OFF: (0, 3), 
+    States.IDLE: (50, 300), 
+    States.ACTIVE: (250, 600)
 }
 
 DEFAULT_MIN_DURATION = 1
-DEFAULT_MAX_DURATION = 60
+DEFAULT_MAX_DURATION = 200
 
 # Column names
 TIMESTAMP = 'timestamp'
@@ -28,59 +28,47 @@ RMS = 'rms'
 RMS_SMOOTHED = 'rms_smoothed'
 STATE_CHANGE = 'state_change'
 
+
 class StateGenerator:
     '''
     This class generates random states for the time series dataset.
     '''
-    def __init__(self, states: List[States], transition_probabilities: Dict[States, Dict[States, float]]):
+    def __init__(self, states: List[States]):
         if not states:
             raise ValueError("States list cannot be empty.")
         self.states = states
-        self.transition_probabilities = transition_probabilities
 
-    def generate_state(self, current_state: States) -> States:
+    def generate_state(self) -> States:
         '''
-        This function generates the next state based on the current state and transition probabilities.
-
-        Args:
-            current_state (States): The current state.
+        This function generates a random state.
 
         Outputs:
-            next_state (States): The next state.
+            current_state (States): The current state.
         '''
-        transition_probs = self.transition_probabilities.get(current_state)
-        if transition_probs is None:
-            raise ValueError(f"No transition probabilities defined for state {current_state}.")
-
-        next_state = random.choices(
-            population=list(transition_probs.keys()),
-            weights=list(transition_probs.values())
-        )[0]
-
-        return next_state
+        return random.choice(self.states)
 
 
 class IntervalGenerator:
     '''
     This class generates the intervals for the time series data.
     '''
-    def __init__(self, state_duration_map: Dict[States, Tuple[int, int]]):
-        self.state_duration_map = state_duration_map
+    def __init__(self, min_duration: int, max_duration: int):
+        self.min_duration = min_duration
+        self.max_duration = max_duration
 
-    def get_duration_for_state(self, state: States) -> int:
+    def generate_interval(self, current_state: States) -> int:
         '''
-        This function returns a duration for the given state based on the state duration map.
+        This function generates a random interval for the current state.
 
         Args:
-            state (States): The current state.
+            current_state (States): The current state.
+            default_interval_ranges (Dict[States, Tuple[int, int]]): The default interval ranges for each state.
 
         Outputs:
-            duration (int): The duration for the state.
+            interval (int): The interval in seconds.
         '''
-        duration_range = self.state_duration_map.get(state)
-        if duration_range is None:
-            raise ValueError(f"No duration range defined for state {state}.")
-        return int(np.random.uniform(duration_range[0], duration_range[1]))
+        interval = random.randint(self.min_duration, self.max_duration)
+        return interval
 
     def calculate_steps(self, interval: int, freq: str) -> int:
         '''
@@ -154,7 +142,6 @@ class DataGenerator:
             current_rms = self.rms_generator.calculate_rms(current_state)
             interval_data.append((current_rms, current_state, current_timestamp))
             current_timestamp += pd.Timedelta(freq)
-            current_state = self.state_generator.generate_state(current_state)
 
         return interval_data
 
@@ -181,15 +168,15 @@ class DataGenerator:
         '''
         time_series_data = []
 
-        current_state = self.state_generator.generate_state(States.OFF)
+        current_state = self.state_generator.generate_state()
         current_timestamp = start_date
 
         while current_timestamp < end_date:
-            interval = self.interval_generator.get_duration_for_state(current_state)
+            interval = random.randint(self.interval_generator.min_duration, self.interval_generator.max_duration)
             interval_data = self._generate_data_for_interval(current_state, current_timestamp, freq, interval)
             time_series_data.extend(interval_data)
             current_timestamp = interval_data[-1][-1]
-            current_state = self.state_generator.generate_state(current_state)
+            current_state = self.state_generator.generate_state()
 
         time_series_df = self._create_dataframe(time_series_data)
         return time_series_df
@@ -223,7 +210,7 @@ class DataGenerator:
         time_series_df['group'] = (time_series_df[STATE_CHANGE]).cumsum()
 
         # Pad each group with a small buffer of data from the neighboring group
-        buffer_size = 4  # The size of the buffer, adjust as needed
+        buffer_size = 2  # The size of the buffer, adjust as needed
         time_series_df[RMS] = time_series_df.groupby('group')[RMS].transform(lambda x: x.rolling(buffer_size, min_periods=1).mean())
 
         # Apply the Kalman filter to each group separately
