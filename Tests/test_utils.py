@@ -17,7 +17,7 @@ def test_generate_time_series_data(time_series_generator):
     assert set(time_series_df.columns) == {'timestamp', 'state', 'rms', 'rms_smoothed'}
 
     # Check that the 'state' column has the correct data type
-    assert time_series_df['state'].dtype == CategoricalDtype(categories=[States.OFF, States.IDLE, States.RUNNING], ordered=True)
+    assert time_series_df['state'].dtype == CategoricalDtype(categories=[States.OFF, States.IDLE, States.ACTIVE], ordered=True)
 
     # Check that the 'timestamp' column has the correct data type
     assert time_series_df['timestamp'].dtype == 'datetime64[ns]'
