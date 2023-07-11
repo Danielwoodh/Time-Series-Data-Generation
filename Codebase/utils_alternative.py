@@ -5,7 +5,9 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 from pykalman import KalmanFilter
-from timesynth import TimeSeries, GaussianProcess, Harmonic, Sinusoidal
+from timesynth import TimeSampler, TimeSeries
+from timesynth.signals import Sinusoidal
+from timesynth.noise import RedNoise
 
 # Constants
 class States(Enum):
@@ -202,7 +204,7 @@ class RMSGenerator:
                 and two numbers (either (min, max) or (mu, sigma) depending on distribution type)."""
             )
 
-    def calculate_rms(self, current_state: States) -> float:
+    def calculate_rms(self, current_state: States, interval: int, steps: int) -> List[float]:
         '''
         This function generates a random RMS value for the current state.
 
@@ -210,20 +212,33 @@ class RMSGenerator:
             current_state (States): The current state.
 
         Outputs:
-            current_rms (float): The current RMS value.
+            current_rms (List[float]): The RMS values for the time period.
         '''
         rms_range = self.rms_ranges.get(current_state)
-        if rms_range is None:
-            raise ValueError(f"No range defined for state {current_state}.")
-        match rms_range[0]:
-            case 'normal':
-                return np.random.normal(rms_range[1], rms_range[2])
-            case 'uniform':
-                return np.random.uniform(rms_range[1], rms_range[2])
-            case 'lognormal':
-                return np.random.lognormal(rms_range[1], rms_range[2])
-            case _:
-                raise ValueError(f'RMS Generator failed for state {current_state}.')
+        if current_state == States.OFF:
+            rms_min, rms_max = 0, 1
+            signal = Sinusoidal(frequency=0.5)
+            noise = RedNoise(std=0.1, tau=0.8)
+        elif current_state == States.IDLE:
+            rms_min, rms_max = 100, 400
+            signal = Sinusoidal(frequency=2)
+            noise = RedNoise(std=0.2, tau=0.8)
+        elif current_state == States.ACTIVE:
+            rms_min, rms_max = 350, 800
+            signal = Sinusoidal(frequency=2)
+            noise = RedNoise(std=4, tau=0.8)
+        else:
+            raise ValueError(f"Invalid state: {current_state}")
+
+        if signal:
+            time_sampler = TimeSampler(stop_time=interval)
+            time_series = TimeSeries(signal, noise_generator=noise)
+            samples, signals, errors = time_series.sample(time_sampler.sample_regular_time(num_points=steps))
+            min_value = min(samples)
+            max_value = max(samples)
+            return [(sample - min_value) / (max_value - min_value) * (rms_max - rms_min) + rms_min for sample in samples]
+        else:
+            raise ValueError(f"Sine wave generator failed for state {current_state}.")
 
 
 class DataGenerator:
@@ -291,7 +306,8 @@ class DataGenerator:
         self,
         current_state: States,
         current_timestamp: datetime,
-        freq: str, interval: int
+        freq: str,
+        interval: int
     ) -> List[Tuple[float, States, datetime]]:
         '''
         Generate data for a single interval.
@@ -307,9 +323,9 @@ class DataGenerator:
         '''
         interval_data = []
         steps = self.interval_generator.calculate_steps(interval, freq)
-        for _ in range(steps):
-            current_rms = self.rms_generator.calculate_rms(current_state)
-            interval_data.append((current_rms, current_state, current_timestamp))
+        rms_for_interval = self.rms_generator.calculate_rms(current_state, interval, steps)
+        for rms_value in rms_for_interval:
+            interval_data.append((rms_value, current_state, current_timestamp))
             current_timestamp += pd.Timedelta(freq)
 
         return interval_data
