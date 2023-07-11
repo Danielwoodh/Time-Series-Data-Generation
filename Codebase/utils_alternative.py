@@ -35,6 +35,11 @@ STATE_CHANGE = 'state_change'
 class StateGenerator:
     '''
     This class generates random states for the time series dataset.
+
+    Args:
+        states (List[States]): The list of states.
+        transition_probabilities (Dict[States, Dict[States, float]]): The transition probabilities.
+        random_seed (int): The random seed.
     '''
     def __init__(
         self,
@@ -117,6 +122,10 @@ class StateGenerator:
 class IntervalGenerator:
     '''
     This class generates the intervals for the time series data.
+
+    Args:
+        state_duration_map (Dict[States, Tuple[int, int]]): The state duration map.
+        random_seed (int): The random seed.
     '''
     def __init__(
         self,
@@ -172,11 +181,18 @@ class IntervalGenerator:
 
 class RMSGenerator:
     '''
-    This class generates random RMS values for the time series dataset.
+    The RMSGenerator class generates random Root Mean Square (RMS) values for a time series dataset based on the current state of the system.
+
+    The RMS values are generated within a pre-defined range for each state, using a specified distribution (uniform, lognormal). This allows the RMSGenerator to simulate different types of fluctuations in RMS values depending on the state of the system.
 
     Args:
-        rms_ranges (Dict[States, Tuple[str, float, float]]): The RMS ranges and distribution type for each state,
-        note that if uniform or lognormal distributions are chosen, the (min, max) values become (mu, sigma).
+        rms_ranges (Dict[States, Tuple[str, float, float]]): The RMS ranges and distribution type for each state. 
+            - The keys should be of the type States, representing the different possible states of the system.
+            - The values should be tuples containing three elements:
+                1. A string indicating the distribution type (uniform, normal, or lognormal).
+                2. The minimum value for the range (if uniform distribution) or the mean value (if lognormal/normal distribution).
+                3. The maximum value for the range (if uniform distribution) or the standard deviation (if lognormal/normal distribution).
+        random_seed (int, optional): A seed for the random number generator, to allow for reproducible results.
     '''
     def __init__(
         self,

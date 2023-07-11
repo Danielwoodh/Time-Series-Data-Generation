@@ -32,6 +32,11 @@ STATE_CHANGE = 'state_change'
 class StateGenerator:
     '''
     This class generates random states for the time series dataset.
+
+    Args:
+        states (List[States]): The list of states.
+        transition_probabilities (Dict[States, Dict[States, float]]): The transition probabilities.
+        random_seed (int): The random seed.
     '''
     def __init__(
         self,
@@ -114,6 +119,10 @@ class StateGenerator:
 class IntervalGenerator:
     '''
     This class generates the intervals for the time series data.
+
+    Args:
+        state_duration_map (Dict[States, Tuple[int, int]]): The state duration map.
+        random_seed (int): The random seed.
     '''
     def __init__(
         self,
@@ -169,11 +178,19 @@ class IntervalGenerator:
 
 class RMSGenerator:
     '''
-    This class generates random RMS values for the time series dataset.
+    The RMSGenerator class generates random RMS values for a time series dataset based on the current state of the system.
+
+    The RMS values are generated within a pre-defined range for each state, using a specified distribution (uniform, lognormal. normal).
+    This allows the RMSGenerator to simulate different types of fluctuations in RMS values depending on the state of the system.
 
     Args:
-        rms_ranges (Dict[States, Tuple[str, float, float]]): The RMS ranges and distribution type for each state,
-        note that if uniform or lognormal distributions are chosen, the (min, max) values become (mu, sigma).
+        rms_ranges (Dict[States, Tuple[str, float, float]]): The RMS ranges and distribution type for each state. 
+            - The keys should be of the type States, representing the different possible states of the system.
+            - The values should be tuples containing three elements:
+                1. A string indicating the distribution type (uniform, normal, or lognormal).
+                2. The minimum value for the range (if uniform distribution) or the mean value (if lognormal/normal distribution).
+                3. The maximum value for the range (if uniform distribution) or the standard deviation (if lognormal/normal distribution).
+        random_seed (int, optional): A seed for the random number generator, to allow for reproducible results.
     '''
     def __init__(
         self,
@@ -222,7 +239,8 @@ class RMSGenerator:
             case 'lognormal':
                 return np.random.lognormal(rms_range[1], rms_range[2])
             case _:
-                raise ValueError(f'RMS Generator failed for state {current_state}.')
+                raise ValueError(f'Invalid distribution type for state {current_state}, '
+                             f'should be "normal", "uniform", or "lognormal".')
 
 
 class DataGenerator:
@@ -384,27 +402,22 @@ class DataGenerator:
             rms_smoothed (pd.Series): The smoothed 'rms' values.
         '''
         # Generate a unique group id for each continuous state
-        time_series_df['group'] = (time_series_df[STATE_CHANGE]).cumsum()
+        df = time_series_df[[STATE_CHANGE, RMS]].copy()
+        df['group'] = (df[STATE_CHANGE]).cumsum()
 
         # Pad each group with a small buffer of data from the neighboring group
         buffer_size = 5  # The size of the buffer, adjust as needed
-        time_series_df[RMS] = time_series_df.groupby('group')[RMS].transform(lambda x: x.rolling(buffer_size, min_periods=1).mean())
+        df[RMS] = df.groupby('group')[RMS].transform(lambda x: x.rolling(buffer_size, min_periods=1).mean())
 
         # Apply the Kalman filter to each group separately
-        rms_smoothed = time_series_df.groupby('group').apply(lambda group: self._apply_kalman_filter_to_group(group[RMS]))
-        print(f'rms_smoothed_initial: {rms_smoothed.head()}')
-        print(type(rms_smoothed))
-
+        rms_smoothed = df.groupby('group').apply(lambda group: self._apply_kalman_filter_to_group(group[RMS]))
         rms_smoothed = rms_smoothed.reset_index(level=0, drop=True)
-        print(f'rms_smoothed_reset: {rms_smoothed.head()}')
         if isinstance(rms_smoothed, pd.Series):
             return rms_smoothed
         elif len(rms_smoothed.columns) > 1:
             # If the Series has a MultiIndex, drop the first level
             rms_smoothed = rms_smoothed.droplevel(0)
-            print(f'rms_smoothed: {rms_smoothed}')
-
-        return rms_smoothed
+            return rms_smoothed
 
     def _apply_kalman_filter_to_group(self, group_rms: pd.Series) -> pd.Series:
         '''
