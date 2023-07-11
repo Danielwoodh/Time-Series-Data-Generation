@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.org/username/repository.svg?branch=master)](https://travis-ci.org/Danielwoodh/MachineMax)
-[![Coverage Status](https://coveralls.io/repos/github/username/repository/badge.svg?branch=master)](https://coveralls.io/github/Danielwoodh/MachineMax?branch=time-series-dan)
+[![Build Status](https://travis-ci.org/Danielwoodh/MachineMax.svg?branch=master)](https://travis-ci.org/Danielwoodh/MachineMax)
+[![Coverage Status](https://coveralls.io/repos/github/Danielwoodh/MachineMax/badge.svg?branch=master)](https://coveralls.io/github/Danielwoodh/MachineMax?branch=time-series-dan)
 
 # Class Descriptions
 
