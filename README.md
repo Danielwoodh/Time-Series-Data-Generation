@@ -10,7 +10,8 @@ before returning to 'ACTIVE'. Probability of switching should be low (0.1% ?).
 # Next Steps:
 
 1. Fix the `_verify_inputs` function, change to switch statement. (DONE)
-2. Fix the time-stamps not changing at transition time.
-3. Fix the randomly high values when transitioning between states.
+2. Fix the time-stamps not changing at transition time. (DONE)
+3. Fix the randomly high values when transitioning between states. (DONE)
 4. Add random intermittent periods of 'IDLE' in 'ACTIVE' and vice-versa. (NOT NEEDED)
-5. Generate 20 dataset samples.
+5. Look into TimeSynth to generate the data by using a signal + noise for each state
+6. Generate 20 dataset samples.

@@ -5,6 +5,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 from pykalman import KalmanFilter
+from timesynth import TimeSeries, GaussianProcess, Harmonic, Sinusoidal
 
 # Constants
 class States(Enum):
@@ -33,13 +34,21 @@ class StateGenerator:
     '''
     This class generates random states for the time series dataset.
     '''
-    def __init__(self, states: List[States], transition_probabilities: Dict[States, Dict[States, float]]):
-        self.validate_inputs(states, transition_probabilities)
+    def __init__(
+        self,
+        states: List[States],
+        transition_probabilities: Dict[States, Dict[States, float]],
+        random_seed: int = None
+    ):
+        self._validate_inputs(states, transition_probabilities)
         self.states = states
         self.transition_probabilities = transition_probabilities
+        self.has_been_active = False
+        if random_seed is not None:
+            random.seed(random_seed)
 
     @staticmethod
-    def validate_inputs(
+    def _validate_inputs(
         states: List[States],
         transition_probabilities: Dict[States, Dict[States, float]]
     ) -> None:
@@ -54,7 +63,8 @@ class StateGenerator:
             raise ValueError('All states must be instances of the States Enum.')
         if not all(isinstance(state, States) and isinstance(prob_dict, dict) 
                     and all(isinstance(s, States) and isinstance(p, float) for s, p in prob_dict.items()) 
-                    for state, prob_dict in transition_probabilities.items()):
+                    for state, prob_dict in transition_probabilities.items()
+        ):
             raise ValueError("Transition probabilities must be a dictionary of States mapped to dictionary of states and probabilities.")
 
     def generate_state(self, current_state: States) -> States:
@@ -70,25 +80,54 @@ class StateGenerator:
         transition_probs = self.transition_probabilities.get(current_state)
         if transition_probs is None:
             raise ValueError(f"No transition probabilities defined for state {current_state}.")
+        
+        match current_state:
+            case States.IDLE:
+                transition_probs = self._handle_idle_state(transition_probs)
+            case States.ACTIVE:
+                self.has_been_active = True  # set flag
+            case States.OFF:
+                self.has_been_active = False # reset flag
+            case _:
+                pass
 
-        next_state = random.choices(
-            population=list(transition_probs.keys()),
-            weights=list(transition_probs.values())
-        )[0]
+        return random.choices(
+                population=list(transition_probs.keys()),
+                weights=list(transition_probs.values())
+            )[0]
 
-        return next_state
+    def _handle_idle_state(self, transition_probs: Dict[States, float]) -> Dict[States, float]:
+        '''
+        This function handles the idle state.
+
+        Args:
+            transition_probs (Dict[States, float]): The transition probabilities.
+
+        Outputs:
+            transition_probs (Dict[States, float]): The transition probabilities.
+        '''
+        if self.has_been_active:
+            return transition_probs
+        else:
+            return {state: prob for state, prob in transition_probs.items() if state != States.OFF}
 
 
 class IntervalGenerator:
     '''
     This class generates the intervals for the time series data.
     '''
-    def __init__(self, state_duration_map: Dict[States, Tuple[int, int]]):
-        self.validate_inputs(state_duration_map)
+    def __init__(
+        self,
+        state_duration_map: Dict[States, Tuple[int, int]],
+        random_seed: int = None
+    ):
+        self._validate_inputs(state_duration_map)
         self.state_duration_map = state_duration_map
+        if random_seed is not None:
+            random.seed(random_seed)
 
     @staticmethod
-    def validate_inputs(state_duration_map: Dict[States, Tuple[int, int]]) -> None:
+    def _validate_inputs(state_duration_map: Dict[States, Tuple[int, int]]) -> None:
         '''
         This function validates the inputs to the IntervalGenerator class.
 
@@ -137,9 +176,15 @@ class RMSGenerator:
         rms_ranges (Dict[States, Tuple[str, float, float]]): The RMS ranges and distribution type for each state,
         note that if uniform or lognormal distributions are chosen, the (min, max) values become (mu, sigma).
     '''
-    def __init__(self, rms_ranges: Dict[States, Tuple[str, float, float]]):
-        self.validate_inputs(rms_ranges)
+    def __init__(
+        self,
+        rms_ranges: Dict[States, Tuple[str, float, float]],
+        random_seed: int = None
+    ):
+        self._validate_inputs(rms_ranges)
         self.rms_ranges = rms_ranges
+        if random_seed is not None:
+            random.seed(random_seed)
 
     @staticmethod
     def _validate_inputs(rms_ranges: Dict[States, Tuple[str, float, float]]) -> None:
@@ -196,16 +241,18 @@ class DataGenerator:
         state_generator: StateGenerator,
         rms_generator: RMSGenerator,
         interval_generator: IntervalGenerator,
-        kalman_filter: KalmanFilter = None
+        kalman_filter: KalmanFilter = None,
+        random_seed: int = None
     ):
         self.state_generator = state_generator
         self.rms_generator = rms_generator
         self.interval_generator = interval_generator
         self.kalman_filter = kalman_filter
+        if random_seed is not None:
+            random.seed(random_seed)
 
     @staticmethod
     def _validate_inputs(
-        self,
         start_date: datetime,
         end_date: datetime,
         freq: str
@@ -237,7 +284,7 @@ class DataGenerator:
         if pd.Timedelta(freq).total_seconds() < 1:
             raise ValueError("Frequency must be at least 1 second.")
         
-        if pd.Timedelta(freq).total_seconds() > end_date - start_date:
+        if pd.Timedelta(freq) > end_date - start_date:
             raise ValueError("Frequency must be less than the time between start date and end date.")
 
     def _generate_data_for_interval(
@@ -278,7 +325,7 @@ class DataGenerator:
         - timestamp: datetime
         - state: str
         - rms: float
-        - rms_smoothed: float#
+        - rms_smoothed: float
 
         Args:
             start_date (datetime): The start date of the dataset.
@@ -288,7 +335,7 @@ class DataGenerator:
         Outputs:
             time_series_df (pd.DataFrame): The generated dataset.
         '''
-        self._verify_inputs(start_date, end_date, freq)
+        self._validate_inputs(start_date, end_date, freq)
         
         time_series_data = []
         current_state = States.OFF
@@ -304,7 +351,7 @@ class DataGenerator:
             # Extend the time series data with the interval data
             time_series_data.extend(interval_data)
             # Update the current timestamp and state
-            current_timestamp = interval_data[-1][-1]
+            current_timestamp = interval_data[-1][-1] + pd.Timedelta(freq)
             # Generate a new state
             current_state = self.state_generator.generate_state(current_state)
 
