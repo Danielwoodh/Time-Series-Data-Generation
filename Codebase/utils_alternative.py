@@ -238,11 +238,11 @@ class RMSGenerator:
         elif current_state == States.IDLE:
             rms_min, rms_max = 100, 400
             signal = Sinusoidal(frequency=2)
-            noise = RedNoise(std=0.2, tau=0.8)
+            noise = RedNoise(std=4, tau=5)
         elif current_state == States.ACTIVE:
             rms_min, rms_max = 350, 800
             signal = Sinusoidal(frequency=2)
-            noise = RedNoise(std=4, tau=0.8)
+            noise = RedNoise(std=4, tau=5)
         else:
             raise ValueError(f"Invalid state: {current_state}")
 
@@ -297,9 +297,11 @@ class DataGenerator:
             freq (str): The frequency of the dataset.
 
         Raises:
-            ValueError: If start_date >= end_date.
-            ValueError: If start_date or end_date is not a datetime object.
-            ValueError: If freq is not a valid pandas date frequency.
+            ValueError: If the start date or end date are not datetime objects.
+            ValueError: If the start date is after the end date.
+            ValueError: If the frequency is not a valid pandas date frequency string.
+            ValueError: If the frequency is less than 1 second.
+            ValueError: If the frequency is greater than the time between the start date and end date.
         '''
         if not isinstance(start_date, datetime) or not isinstance(end_date, datetime):
             raise ValueError("Start date and end date must be datetime objects.")
