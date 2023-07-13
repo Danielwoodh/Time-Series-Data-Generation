@@ -6,7 +6,7 @@ from sklearn.model_selection import TimeSeriesSplit, GridSearchCV, train_test_sp
 from sklearn.metrics import roc_curve, roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix, accuracy_score, auc, classification_report
 from sklearn.preprocessing import OneHotEncoder, label_binarize
 from sklearn.preprocessing import MinMaxScaler
-from utils import States
+from Codebase.utils import States
 
 class TimeSeriesModelEvaluator:
     '''
@@ -23,6 +23,7 @@ class TimeSeriesModelEvaluator:
     ):
         self.model = model
         self.hyperparams = hyperparams
+        self.model_name = type(self.model).__name__
 
     def compute_metrics(
         self,
@@ -74,7 +75,7 @@ class TimeSeriesModelEvaluator:
         plt.ylim([0.0, 1.05])
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
-        plt.title('ROC_AUC Curve for Logistic Regression Model')
+        plt.title(f'ROC_AUC Curve for {self.model_name} Model')
         plt.legend(loc="lower right")
         plt.show()
 

@@ -9,7 +9,6 @@ sys.path.append('c:/Users/Danie/Desktop/MachineMax Tech_Test/Codebase')
 from statistical_models import LinearRegressionPredictor
 
 class TestLinearRegressionPredictor(unittest.TestCase):
-
     def setUp(self):
         self.model = LinearRegression()
         self.predictor = LinearRegressionPredictor(self.model)
@@ -73,6 +72,7 @@ class TestLinearRegressionPredictor(unittest.TestCase):
         self.assertIn('confusion_matrix', metrics)
         self.assertIn('roc_auc', metrics)
         self.assertIn('average_roc_auc', metrics)
+
 
 if __name__ == "__main__":
     unittest.main()
