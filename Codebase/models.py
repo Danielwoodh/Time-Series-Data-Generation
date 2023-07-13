@@ -35,6 +35,7 @@ class TimeSeriesModelEvaluator:
             'precision': precision_score(y_tests, y_preds, average='macro', zero_division=0),
             'recall': recall_score(y_tests, y_preds, average='macro', zero_division=0),
             'f1_score': f1_score(y_tests, y_preds, average='macro'),
+            'roc_auc': roc_auc_score(y_tests, y_preds, average='macro', multi_class='ovo'),
             'confusion_matrix': confusion_matrix(y_tests, y_preds),
             'classification_report': classification_report(y_tests, y_preds)
         } 
@@ -95,7 +96,7 @@ class TimeSeriesModelEvaluator:
     def evaluate_cv(self, X, y, cv):
         y_preds = []
         y_tests = []
-        for i, (train_index, test_index) in enumerate(cv):
+        for i, (train_index, test_index) in enumerate(cv.split(X)):
             print(f'Fold {i+1}')
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
@@ -112,6 +113,7 @@ class TimeSeriesModelEvaluator:
         # Plot confusion matrix and ROC AUC
         self.plot_confusion_matrix(metrics['confusion_matrix'])
         # self.plot_roc_auc(y_tests, y_preds, metrics)
+        return metrics
     
     def evaluate(self,
         X: np.ndarray,

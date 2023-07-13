@@ -57,8 +57,8 @@ before returning to 'ACTIVE'. Probability of switching should be low (0.1% ?).
 
 # Next Steps:
 
-1. Fix the ROC_AUC curve (plot 1 line per class)
+1. Fix the ROC_AUC curve (plot 1 line per class) (IN PROGRESS)
 2. Implement Time-Series Forest
 3. Implement LSTM
-4. Write unit-tests for models.py
+4. Write unit-tests for models.py (1/2 DONE)
 5. Complete Stretch goals
