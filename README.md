@@ -54,11 +54,3 @@ The `RMSGenerator` class handles the generation of RMS values for each state of 
 - Add randomness to the 'ACTIVE' state, at each time-step, do a check to see if it switches to 'IDLE' based
 on a probability, if it does, determine a random interval to be at 'IDLE' (should be low, 2-10 time-steps)
 before returning to 'ACTIVE'. Probability of switching should be low (0.1% ?).
-
-# Next Steps:
-
-2. Add Descriptions for each model, and add limitations. assumptions + improvements for each (1/2 DONE)
-4. Write unit-tests for the models (1/2 DONE)
-5. Complete Stretch goals (1/2 DONE)
-6. CHECK IF LINEAR REGRESSION IS SUITABLE (DONE)
-7. Transfer continuous detection to models.py (Not Necessary)

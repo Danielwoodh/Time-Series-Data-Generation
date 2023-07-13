@@ -54,13 +54,33 @@ class TimeSeriesModelEvaluator:
         self,
         cm: np.ndarray
     ) -> None:
+        '''
+        This function is used to plot the confusion matrix.
+
+        Args:
+            cm (np.ndarray): The confusion matrix
+        '''
         plt.figure(figsize=(10, 10))
         sns.heatmap(cm, annot=True, fmt="d")
         plt.title('Confusion matrix')
         plt.ylabel('Actual label')
         plt.xlabel('Predicted label')
 
-    def plot_roc_auc(self, y_tests: np.ndarray, y_preds: np.ndarray) -> None:
+    def plot_roc_auc(
+        self,
+        y_tests: np.ndarray,
+        y_preds: np.ndarray
+    ) -> None:
+        '''
+        This function is used to plot the ROC AUC curve.
+
+        Args:
+            y_tests (np.ndarray): The true labels
+            y_preds (np.ndarray): The predicted labels
+
+        Returns:
+            roc_auc (dict): A dictionary of ROC AUC scores for each class
+        '''
         # Binarize the output
         classes = np.unique(y_tests)
         y_bin = label_binarize(y_tests, classes=classes)
@@ -91,7 +111,17 @@ class TimeSeriesModelEvaluator:
 
         return roc_auc
 
-    def evaluate_no_cv(self, X, y):
+    def evaluate_no_cv(self, X: pd.Series, y: pd.Series) -> dict:
+        '''
+        This function is used to evaluate the model without cross validation.
+
+        Args:
+            X (pd.Series): The features
+            y (pd.Series): The labels
+
+        Returns:
+            metrics (dict): A dictionary of calculated metrics
+        '''
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, shuffle=False)
         self.model.fit(X_train, y_train)
         y_pred = self.model.predict(X_test)
@@ -104,7 +134,15 @@ class TimeSeriesModelEvaluator:
 
         return metrics
 
-    def evaluate_cv(self, X, y, cv):
+    def evaluate_cv(self, X: pd.Series, y: pd.Series, cv: int) -> dict:
+        '''
+        This function is used to evaluate the model with TimeSeries cross validation.
+
+        Args:
+            X (pd.Series): The features
+            y (pd.Series): The labels
+            cv (int): The number of folds for TimeSeries cross validation
+        '''
         y_preds = []
         y_tests = []
         for i, (train_index, test_index) in enumerate(cv.split(X)):
