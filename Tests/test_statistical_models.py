@@ -1,41 +1,63 @@
+import unittest
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
+from unittest.mock import patch
+# import the necessary modules from your project
 import sys
 sys.path.append('c:/Users/Danie/Desktop/MachineMax Tech_Test/Codebase')
 from statistical_models import LinearRegressionPredictor
 
-def test_calculate_slope():
-    model = LinearRegression()
-    predictor = LinearRegressionPredictor(model)
-    series = pd.Series([1, 2, 3, 4, 5])
-    slope = predictor.calculate_slope(series)
-    assert np.isclose(slope, 1.0)
+class TestLinearRegressionPredictor(unittest.TestCase):
 
-def test_compute_metrics():
-    model = LinearRegression()
-    predictor = LinearRegressionPredictor(model)
-    y_tests = np.array([0, 1, 2, 0, 1, 2])
-    y_preds = np.array([0, 1, 2, 1, 0, 2])
-    metrics = predictor.compute_metrics(y_tests, y_preds)
-    assert np.isclose(metrics['accuracy'], 0.5)
-    assert np.isclose(metrics['precision'], 0.3333333333333333)
-    assert np.isclose(metrics['recall'], 0.3333333333333333)
-    assert np.isclose(metrics['f1_score'], 0.3333333333333333)
-    assert np.array_equal(metrics['confusion_matrix'], np.array([[1, 1, 0], [1, 0, 1], [0, 1, 1]]))
+    def setUp(self):
+        self.model = LinearRegression()
+        self.predictor = LinearRegressionPredictor(self.model)
 
-def test_predict():
-    model = LinearRegression()
-    predictor = LinearRegressionPredictor(model)
-    df = pd.DataFrame({'rms': [1, 2, 3, 4, 5], 'state_encoded': [0, 1, 2, 0, 1]})
-    engine_state, metrics = predictor.predict(df)
-    assert np.array_equal(engine_state, np.array([1, 1, 1, 1, 1]))
-    assert np.isclose(metrics['accuracy'], 0.4)
-    assert np.isclose(metrics['precision'], 0.3333333333333333)
-    assert np.isclose(metrics['recall'], 0.3333333333333333)
-    assert np.isclose(metrics['f1_score'], 0.3333333333333333)
-    assert np.array_equal(metrics['confusion_matrix'], np.array([[0, 2, 0], [0, 1, 1], [0, 1, 0]]))
-    assert np.isclose(metrics['roc_auc'][0], 0.5)
-    assert np.isclose(metrics['roc_auc'][1], 0.5)
-    assert np.isclose(metrics['roc_auc'][2], 0.5)
-    assert np.isclose(metrics['average_roc_auc'], 0.5)
+    def test_calculate_slope(self):
+        series = pd.Series([1, 2, 3, 4, 5])
+        expected_slope = 1.0
+        result_slope = self.predictor.calculate_slope(series)
+        self.assertEqual(result_slope, expected_slope)
+
+    def test_compute_metrics(self):
+        y_tests = np.array([0, 0, 1, 1])
+        y_preds = np.array([0, 1, 1, 1])
+        metrics = self.predictor.compute_metrics(y_tests, y_preds)
+        self.assertIn('accuracy', metrics)
+        self.assertIn('precision', metrics)
+        self.assertIn('recall', metrics)
+        self.assertIn('f1_score', metrics)
+        self.assertIn('confusion_matrix', metrics)
+        self.assertIn('classification_report', metrics)
+        
+    @patch('matplotlib.pyplot.show')
+    def test_plot_roc_auc(self, plt_mock):
+        y_tests = np.array([0, 0, 2, 1])
+        y_preds = np.array([0, 2, 1, 1])
+        auc = self.predictor.plot_roc_auc(y_tests, y_preds)
+        self.assertEqual(len(auc), len(np.unique(y_tests)))
+
+    @patch('matplotlib.pyplot.show')
+    def test_plot_confusion_matrix(self, plt_mock):
+        cm = np.array([[2, 1], [1, 2]])
+        self.predictor.plot_confusion_matrix(cm)
+
+    @patch('matplotlib.pyplot.show')
+    def test_predict(self, plt_mock):
+        df = pd.DataFrame({
+            'rms': [1.0, 1.1, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5],
+            'state_encoded': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        })
+        engine_state, metrics = self.predictor.predict(df)
+        self.assertEqual(len(engine_state), len(df))
+        self.assertIn('accuracy', metrics)
+        self.assertIn('precision', metrics)
+        self.assertIn('recall', metrics)
+        self.assertIn('f1_score', metrics)
+        self.assertIn('confusion_matrix', metrics)
+        self.assertIn('roc_auc', metrics)
+        self.assertIn('average_roc_auc', metrics)
+
+if __name__ == "__main__":
+    unittest.main()

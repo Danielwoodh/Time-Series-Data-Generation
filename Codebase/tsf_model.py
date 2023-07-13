@@ -1,5 +1,6 @@
 from sktime.classification.interval_based import TimeSeriesForest
 from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import TimeSeriesSplit
 from utils import generate_time_series_data
 
 # Generate time-series data
@@ -23,11 +24,11 @@ param_grid = {
     'min_interval': [2, 3, 4],
     'n_jobs': [-1]
 }
-
+tscv = TimeSeriesSplit(n_splits=5)
 # Fit TimeSeriesForest model with GridSearchCV
 tsf = TimeSeriesForest(random_state=0)
 # Currently this uses cross-validation, but this is not applicable for time-series data.
-grid_search = GridSearchCV(tsf, param_grid, cv=5, n_jobs=-1)
+grid_search = GridSearchCV(tsf, param_grid, cv=tscv, n_jobs=-1)
 grid_search.fit(X_train, y_train)
 
 # This should fix it, pseudo hard-coded grid-search

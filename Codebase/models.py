@@ -6,8 +6,7 @@ from sklearn.model_selection import TimeSeriesSplit, GridSearchCV, train_test_sp
 from sklearn.metrics import roc_curve, roc_auc_score, f1_score, precision_score, recall_score, confusion_matrix, accuracy_score, auc, classification_report
 from sklearn.preprocessing import OneHotEncoder, label_binarize
 from sklearn.preprocessing import MinMaxScaler
-from Codebase.utils import States
-import shap
+from utils import States
 
 class TimeSeriesModelEvaluator:
     '''
