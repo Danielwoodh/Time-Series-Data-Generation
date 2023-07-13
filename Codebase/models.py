@@ -30,6 +30,16 @@ class TimeSeriesModelEvaluator:
         y_tests: np.ndarray,
         y_preds: np.ndarray
     ) -> dict:
+        '''
+        This function is used to compute various metrics given true and predicted labels.
+
+        Args:
+            y_tests (np.ndarray): The true labels
+            y_preds (np.ndarray): The predicted labels
+
+        Returns:
+            metrics (dict): A dictionary of calculated metrics
+        '''
         metrics = {
             'accuracy': accuracy_score(y_tests, y_preds),
             'precision': precision_score(y_tests, y_preds, average='macro', zero_division=0),
