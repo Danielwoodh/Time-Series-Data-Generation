@@ -39,6 +39,9 @@ class TestTimeSeriesModelEvaluator(unittest.TestCase):
         self.evaluator = TimeSeriesModelEvaluator(self.model, self.hyperparams)
 
     def test_compute_metrics(self):
+        '''
+        This test will pass if the metrics are computed correctly
+        '''
         # Given
         y_test = np.array([0, 1, 2, 2, 1])
         y_pred = np.array([0, 1, 2, 1, 1])
@@ -50,6 +53,9 @@ class TestTimeSeriesModelEvaluator(unittest.TestCase):
         self.assertEqual(metrics['accuracy'], 0.8)
 
     def test_plot_confusion_matrix(self):
+        '''
+        This test will pass if the confusion matrix is plotted correctly
+        '''
         # Given
         cm = np.array([[2, 0, 0], [0, 2, 1], [0, 0, 0]])
 
@@ -58,9 +64,11 @@ class TestTimeSeriesModelEvaluator(unittest.TestCase):
         self.evaluator.plot_confusion_matrix(cm)
 
     def test_evaluate_no_cv(self):
+        '''
+        This test will pass if the metrics are computed correctly with no CV
+        '''
         # When
         metrics = self.evaluator.evaluate_no_cv(self.X, self.y)
-
         # Then
         self.assertIn('accuracy', metrics)
         self.assertIn('precision', metrics)
@@ -72,6 +80,9 @@ class TestTimeSeriesModelEvaluator(unittest.TestCase):
         self.assertIn('average_roc_auc', metrics)
 
     def test_evaluate_cv(self):
+        '''
+        This test will pass if the metrics are computed correctly with CV TimeSeriesSplit
+        '''
         # Given
         cv = TimeSeriesSplit(n_splits=3)
 
@@ -89,6 +100,9 @@ class TestTimeSeriesModelEvaluator(unittest.TestCase):
         self.assertIn('average_roc_auc', metrics)
 
     def test_evaluate(self):
+        '''
+        This test will pass if the metrics are computed correctly for the default split
+        '''
         # When
         metrics = self.evaluator.evaluate(self.X, self.y)
 
@@ -103,6 +117,9 @@ class TestTimeSeriesModelEvaluator(unittest.TestCase):
         self.assertIn('average_roc_auc', metrics)
 
     def test_evaluate_error(self):
+        '''
+        This test will pass if the ValueError is raised when an invalid split is passed
+        '''
         # When/Then
         with self.assertRaises(ValueError):
             self.evaluator.evaluate(self.X, self.y, 'InvalidSplit', n_splits=5)
