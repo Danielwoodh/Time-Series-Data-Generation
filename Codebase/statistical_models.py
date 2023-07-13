@@ -6,10 +6,16 @@ from sklearn.preprocessing import label_binarize
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-class EngineStatePredictor:
+class LinearRegressionPredictor:
+    '''
+    This class is used to predict the engine state using linear regression.
+
+    Args:
+        model (sklearn.linear_model): The model to use for prediction
+    '''
     def __init__(self, model: LinearRegression):
         """
-        Initialize an instance of EngineStatePredictor.
+        Initialize an instance of LinearRegressionPredictor.
         """
         self.model = model
 
@@ -57,10 +63,11 @@ class EngineStatePredictor:
             y_tests (np.ndarray): The true labels
             y_preds (np.ndarray): The predicted labels
         """
-        y_true = label_binarize(y_tests, classes=[0, 1, 2])
-        y_pred = label_binarize(y_preds, classes=[0, 1, 2])
+        classes = np.unique(y_tests)
+        y_true = label_binarize(y_tests, classes=classes)
+        y_pred = label_binarize(y_preds, classes=classes)
 
-        n_classes = 3
+        n_classes = len(classes)
         fpr = dict()
         tpr = dict()
         roc_auc = dict()
@@ -82,6 +89,8 @@ class EngineStatePredictor:
         plt.ylabel('True Positive Rate')
         plt.legend()
         plt.show()
+
+        return roc_auc
 
     def plot_confusion_matrix(self, cm: np.ndarray) -> None:
         """
@@ -112,6 +121,8 @@ class EngineStatePredictor:
 
         metrics = self.compute_metrics(df['state_encoded'], engine_state)
         self.plot_confusion_matrix(metrics['confusion_matrix'])
-        self.plot_roc_auc(df['state_encoded'], engine_state)
+        roc_auc = self.plot_roc_auc(df['state_encoded'], engine_state)
+        metrics['roc_auc'] = roc_auc
+        metrics['average_roc_auc'] = np.mean(list(roc_auc.values()))
 
         return engine_state, metrics
