@@ -58,6 +58,7 @@ before returning to 'ACTIVE'. Probability of switching should be low (0.1% ?).
 # Next Steps:
 
 1. Fix the ROC_AUC curve (plot 1 line per class) (DONE)
-2. Add Descriptions for each model, and add limitations + improvements for each (1/2 DONE) 
-4. Write unit-tests for models.py (1/2 DONE)
+2. Add Descriptions for each model, and add limitations + improvements for each (1/2 DONE)
+3. Transfer continuous detection to models.py
+4. Write unit-tests for the models (1/2 DONE)
 5. Complete Stretch goals (1/2 DONE)
