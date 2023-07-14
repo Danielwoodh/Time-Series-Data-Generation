@@ -1,6 +1,53 @@
 [![Build Status](https://travis-ci.org/Danielwoodh/MachineMax.svg?branch=time-series-dan)](https://travis-ci.org/Danielwoodh/MachineMax)
 [![Coverage Status](https://coveralls.io/repos/github/Danielwoodh/MachineMax/badge.svg?branch=time-series-dan)](https://coveralls.io/github/Danielwoodh/MachineMax?branch=time-series-dan)
 
+# Installation
+
+1. To run the cells, setup a new `conda` environment by navigating to this folder in a terminal and using the following command:
+
+`conda env create -f environment.yml`
+
+2. Activate the environment:
+
+`conda activate MachineMax`
+
+# Usage
+
+```
+project
+│   README.md
+│   Data Generation - 0.0.ipynb
+|   Models - 1.0.ipynb
+|   Stretch - 2.0.ipynb
+|   environment.yml
+│
+└───Codebase
+│   │   __init__.py
+│   │   models.py
+|   |   statistical_models.py
+|   |   tsf_model.py
+|   |   utils_alternative.py
+|   |   utils.py
+│   
+└───data
+|   │   time-series1.csv
+|
+└───tests
+|   |   test_models.py
+|   |   test_statistical_models.py
+|   |   test_utils_alternative.py
+|   |   test_utils.py
+|
+```
+
+- The 3 notebooks in the root directory show a workthrough of the data-generation, model building, and my approach for the stretch goals.
+
+- The files in the codebase contain the relevant classes and methods needed to generate data and build the models. `utils.py` and `utils_alternative.py` show two alternate methods for generating the rms values.
+
+- The tests folder contains unit-tests for all scripts in the Codebase folder, except for `tsf_model.py`
+
+- The data folder shows an example csv of the generated data
+
 # Class Descriptions
 
 This document provides a comprehensive overview of the following classes: `DataGenerator`, `StateGenerator`, `IntervalGenerator`, and `RMSGenerator`.
