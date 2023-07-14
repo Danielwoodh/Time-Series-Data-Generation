@@ -3,11 +3,11 @@
 
 # Installation
 
-1. To run the cells, setup a new `conda` environment by navigating to this folder in a terminal and using the following command:
+1. Clone this repository: `git clone https://github.com/Danielwoodh/Time-Series-Data-Generation.git`
+  
+2. To run the cells, setup a new `conda` environment by navigating to this folder in a terminal and using the following command: `conda env create -f environment.yml`
 
-`conda env create -f environment.yml`
-
-2. Activate the environment:
+3. Activate the environment:
 
 `conda activate MachineMax`
 
