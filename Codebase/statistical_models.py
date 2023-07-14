@@ -119,6 +119,14 @@ class LinearRegressionPredictor:
         engine_state = np.where(rolling_slope > 0, 0, 1)
         engine_state = np.where(df['rms'] < 2, 2, engine_state)
 
+        for i in range(1, len(engine_state)):
+            # If previous state is 0 and slope is negative, change state to 1
+            if engine_state[i-1] == 0 and rolling_slope[i] < 0:
+                engine_state[i] = 1
+            # If previous state is 1 and slope is positive, change state to 0
+            if engine_state[i-1] == 1 and rolling_slope[i] > 0:
+                engine_state[i] = 0
+
         metrics = self.compute_metrics(df['state_encoded'], engine_state)
         self.plot_confusion_matrix(metrics['confusion_matrix'])
         roc_auc = self.plot_roc_auc(df['state_encoded'], engine_state)
