@@ -5,6 +5,9 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 from pykalman import KalmanFilter
+from timesynth import TimeSampler, TimeSeries
+from timesynth.signals import Sinusoidal
+from timesynth.noise import RedNoise
 
 # Constants
 class States(Enum):
@@ -178,10 +181,9 @@ class IntervalGenerator:
 
 class RMSGenerator:
     '''
-    The RMSGenerator class generates random RMS values for a time series dataset based on the current state of the system.
+    The RMSGenerator class generates random Root Mean Square (RMS) values for a time series dataset based on the current state of the system.
 
-    The RMS values are generated within a pre-defined range for each state, using a specified distribution (uniform, lognormal. normal).
-    This allows the RMSGenerator to simulate different types of fluctuations in RMS values depending on the state of the system.
+    The RMS values are generated within a pre-defined range for each state, using a specified distribution (uniform, lognormal). This allows the RMSGenerator to simulate different types of fluctuations in RMS values depending on the state of the system.
 
     Args:
         rms_ranges (Dict[States, Tuple[str, float, float]]): The RMS ranges and distribution type for each state. 
@@ -218,7 +220,7 @@ class RMSGenerator:
                 and two numbers (either (min, max) or (mu, sigma) depending on distribution type)."""
             )
 
-    def calculate_rms(self, current_state: States) -> float:
+    def calculate_rms(self, current_state: States, interval: int, steps: int) -> List[float]:
         '''
         This function generates a random RMS value for the current state.
 
@@ -226,21 +228,33 @@ class RMSGenerator:
             current_state (States): The current state.
 
         Outputs:
-            current_rms (float): The current RMS value.
+            current_rms (List[float]): The RMS values for the time period.
         '''
         rms_range = self.rms_ranges.get(current_state)
-        if rms_range is None:
-            raise ValueError(f"No range defined for state {current_state}.")
-        match rms_range[0]:
-            case 'normal':
-                return np.random.normal(rms_range[1], rms_range[2])
-            case 'uniform':
-                return np.random.uniform(rms_range[1], rms_range[2])
-            case 'lognormal':
-                return np.random.lognormal(rms_range[1], rms_range[2])
-            case _:
-                raise ValueError(f'Invalid distribution type for state {current_state}, '
-                             f'should be "normal", "uniform", or "lognormal".')
+        if current_state == States.OFF:
+            rms_min, rms_max = 0, 1
+            signal = Sinusoidal(frequency=0.5)
+            noise = RedNoise(std=0.1, tau=0.8)
+        elif current_state == States.IDLE:
+            rms_min, rms_max = 100, 400
+            signal = Sinusoidal(frequency=2)
+            noise = RedNoise(std=4, tau=5)
+        elif current_state == States.ACTIVE:
+            rms_min, rms_max = 350, 800
+            signal = Sinusoidal(frequency=2)
+            noise = RedNoise(std=4, tau=5)
+        else:
+            raise ValueError(f"Invalid state: {current_state}")
+
+        if signal:
+            time_sampler = TimeSampler(stop_time=interval)
+            time_series = TimeSeries(signal, noise_generator=noise)
+            samples, signals, errors = time_series.sample(time_sampler.sample_regular_time(num_points=steps))
+            min_value = min(samples)
+            max_value = max(samples)
+            return [(sample - min_value) / (max_value - min_value) * (rms_max - rms_min) + rms_min for sample in samples]
+        else:
+            raise ValueError(f"Sine wave generator failed for state {current_state}.")
 
 
 class DataGenerator:
@@ -283,9 +297,11 @@ class DataGenerator:
             freq (str): The frequency of the dataset.
 
         Raises:
-            ValueError: If start_date >= end_date.
-            ValueError: If start_date or end_date is not a datetime object.
-            ValueError: If freq is not a valid pandas date frequency.
+            ValueError: If the start date or end date are not datetime objects.
+            ValueError: If the start date is after the end date.
+            ValueError: If the frequency is not a valid pandas date frequency string.
+            ValueError: If the frequency is less than 1 second.
+            ValueError: If the frequency is greater than the time between the start date and end date.
         '''
         if not isinstance(start_date, datetime) or not isinstance(end_date, datetime):
             raise ValueError("Start date and end date must be datetime objects.")
@@ -308,7 +324,8 @@ class DataGenerator:
         self,
         current_state: States,
         current_timestamp: datetime,
-        freq: str, interval: int
+        freq: str,
+        interval: int
     ) -> List[Tuple[float, States, datetime]]:
         '''
         Generate data for a single interval.
@@ -324,9 +341,9 @@ class DataGenerator:
         '''
         interval_data = []
         steps = self.interval_generator.calculate_steps(interval, freq)
-        for _ in range(steps):
-            current_rms = self.rms_generator.calculate_rms(current_state)
-            interval_data.append((current_rms, current_state, current_timestamp))
+        rms_for_interval = self.rms_generator.calculate_rms(current_state, interval, steps)
+        for rms_value in rms_for_interval:
+            interval_data.append((rms_value, current_state, current_timestamp))
             current_timestamp += pd.Timedelta(freq)
 
         return interval_data
@@ -402,22 +419,27 @@ class DataGenerator:
             rms_smoothed (pd.Series): The smoothed 'rms' values.
         '''
         # Generate a unique group id for each continuous state
-        df = time_series_df[[STATE_CHANGE, RMS]].copy()
-        df['group'] = (df[STATE_CHANGE]).cumsum()
+        time_series_df['group'] = (time_series_df[STATE_CHANGE]).cumsum()
 
         # Pad each group with a small buffer of data from the neighboring group
         buffer_size = 5  # The size of the buffer, adjust as needed
-        df[RMS] = df.groupby('group')[RMS].transform(lambda x: x.rolling(buffer_size, min_periods=1).mean())
+        time_series_df[RMS] = time_series_df.groupby('group')[RMS].transform(lambda x: x.rolling(buffer_size, min_periods=1).mean())
 
         # Apply the Kalman filter to each group separately
-        rms_smoothed = df.groupby('group').apply(lambda group: self._apply_kalman_filter_to_group(group[RMS]))
+        rms_smoothed = time_series_df.groupby('group').apply(lambda group: self._apply_kalman_filter_to_group(group[RMS]))
+        print(f'rms_smoothed_initial: {rms_smoothed.head()}')
+        print(type(rms_smoothed))
+
         rms_smoothed = rms_smoothed.reset_index(level=0, drop=True)
+        print(f'rms_smoothed_reset: {rms_smoothed.head()}')
         if isinstance(rms_smoothed, pd.Series):
             return rms_smoothed
         elif len(rms_smoothed.columns) > 1:
             # If the Series has a MultiIndex, drop the first level
             rms_smoothed = rms_smoothed.droplevel(0)
-            return rms_smoothed
+            print(f'rms_smoothed: {rms_smoothed}')
+
+        return rms_smoothed
 
     def _apply_kalman_filter_to_group(self, group_rms: pd.Series) -> pd.Series:
         '''
