@@ -7,7 +7,7 @@
   
 2. To run the cells, setup a new `conda` environment by navigating to this folder in a terminal and using the following command: `conda env create -f environment.yml`
 
-3. Activate the environment: `conda activate MachineMax`
+3. Activate the environment: `conda activate TimeSeriesGen`
 
 # Usage
 
